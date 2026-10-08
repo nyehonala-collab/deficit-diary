@@ -99,8 +99,33 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .status span { color: var(--ink); font-size: 14px; }
 
 /* Add form */
-form.add { display: grid; grid-template-columns: minmax(0, 1fr) 96px 120px auto; gap: 8px; }
-@media (max-width: 560px) { form.add { grid-template-columns: minmax(0, 1fr) 96px; } form.add .meal, form.add .go { grid-column: span 1; } }
+form.add { display: grid; gap: 10px; }
+.search { position: relative; }
+.suggest { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 14%, transparent); max-height: 300px; overflow-y: auto; }
+.suggest button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; }
+.suggest button:hover, .suggest button.active { background: var(--accent-soft); }
+.suggest .sn { overflow-wrap: anywhere; }
+.suggest .se { font-size: 12px; color: var(--muted); }
+.suggest .sv { font: 12px var(--font-mono); color: var(--accent); }
+.suggest .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-left: 6px; }
+.amount-row { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }
+.per { grid-column: 1 / -1; font-size: 13px; color: var(--muted); min-height: 0; }
+.per:empty { display: none; }
+.nums-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 8px; align-items: end; }
+.nums-row label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+@media (max-width: 560px) { .nums-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nums-row .go { height: 42px; } }
+.save-mine { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.save-mine input { width: auto; }
+.prot { display: grid; gap: 6px; }
+.prot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.prot-head strong { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pbar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s ease; }
+.pbar.done i { background: var(--good); }
+.prot .hint { font-size: 13px; color: var(--muted); }
+.entry .pg { color: var(--muted); font-size: 12px; }
+.mine-list { display: grid; gap: 0; margin-top: 8px; }
+.mine-list .entry { grid-template-columns: minmax(0, 1fr) auto 28px; }
 input, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-width: 0; width: 100%; }
 input[type=number] { font-family: var(--font-mono); }
 .go { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
@@ -115,7 +140,7 @@ input[type=number] { font-family: var(--font-mono); }
 /* Entries */
 .meal-group { display: grid; gap: 2px; }
 .meal-head { display: flex; justify-content: space-between; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
-.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto 28px; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 28px; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
 .entry .name { overflow-wrap: anywhere; }
 .entry .del { border: 0; background: none; color: var(--muted); font-size: 18px; width: 28px; height: 28px; border-radius: 6px; }
 .entry .del:hover { color: var(--low); background: var(--low-soft); }
@@ -200,20 +225,37 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
           <div class="marks" id="marks"></div>
         </div>
         <div class="status empty" id="status"></div>
+        <div class="prot" id="prot">
+          <div class="prot-head"><span>Protein</span><strong id="prot-num">0 / 100 g</strong></div>
+          <div class="pbar" id="pbar"><i style="width:0%"></i></div>
+          <span class="hint" id="prot-hint"></span>
+        </div>
       </section>
 
       <section class="panel" aria-label="Add food">
         <h2>Add food</h2>
         <form class="add" id="add-form" autocomplete="off">
-          <input id="f-name" placeholder="Food, e.g. Greek yogurt + berries" required aria-label="Food">
-          <input id="f-kcal" type="number" inputmode="numeric" min="0" max="5000" placeholder="kcal" required aria-label="Calories">
-          <select id="f-meal" class="meal" aria-label="Meal">
-            <option value="breakfast">Breakfast</option>
-            <option value="lunch">Lunch</option>
-            <option value="dinner">Dinner</option>
-            <option value="snack">Snack</option>
-          </select>
-          <button class="go" type="submit">Add</button>
+          <div class="search">
+            <input id="f-name" placeholder="Search foods or type a name, e.g. 雞胸肉" required aria-label="Food" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggest">
+            <ul id="suggest" class="suggest" role="listbox" hidden></ul>
+          </div>
+          <div class="amount-row">
+            <input id="f-amt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount (optional)" aria-label="Amount">
+            <select id="f-unit" aria-label="Unit"></select>
+            <span class="per" id="f-per"></span>
+          </div>
+          <div class="nums-row">
+            <label>kcal<input id="f-kcal" type="number" inputmode="numeric" min="0" max="5000" required></label>
+            <label>Protein g<input id="f-prot" type="number" inputmode="decimal" min="0" max="300" step="0.1"></label>
+            <label>Meal<select id="f-meal">
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+              <option value="snack">Snack</option>
+            </select></label>
+            <button class="go" type="submit">Add</button>
+          </div>
+          <label class="save-mine" id="save-wrap" hidden><input type="checkbox" id="f-save"> Save to My foods for next time</label>
         </form>
         <div id="recent-wrap" hidden>
           <h2 style="margin-bottom:8px">Recent · tap to add again</h2>
@@ -229,8 +271,8 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
         <div class="stats">
           <div class="stat"><span class="k">BMR · at rest</span><span class="v" id="s-bmr">–</span></div>
           <div class="stat"><span class="k">TDEE · maintenance</span><span class="v" id="s-tdee">–</span></div>
-          <div class="stat"><span class="k">Daily goal</span><span class="v" id="s-goal">–</span></div>
-          <div class="stat"><span class="k">BMI</span><span class="v" id="s-bmi">–</span></div>
+          <div class="stat"><span class="k">Calorie goal</span><span class="v" id="s-goal">–</span></div>
+          <div class="stat"><span class="k">Protein goal</span><span class="v" id="s-prot">–</span></div>
         </div>
         <details>
           <summary>Edit profile</summary>
@@ -241,6 +283,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
             <label>Age<input id="pf-age" type="number" min="15" max="100"></label>
             <label>Sex<select id="pf-sex"><option value="female">Female</option><option value="male">Male</option></select></label>
             <label>Deficit goal<input id="pf-def" type="number" min="0" max="1500" step="50"></label>
+            <label>Protein goal g<input id="pf-prot" type="number" min="0" max="300" step="5"></label>
             <label class="wide">Activity
               <select id="pf-act">
                 <option value="sedentary">Sedentary · desk job, little exercise (×1.2)</option>
@@ -252,7 +295,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
             </label>
           </div>
         </details>
-        <p class="formula">BMR uses Mifflin–St Jeor. TDEE = BMR × activity factor. Goal = TDEE − deficit goal. Update your weight as it changes and the numbers follow.</p>
+        <p class="formula"><span id="s-bmi"></span> BMR uses Mifflin–St Jeor. TDEE = BMR × activity factor. Goal = TDEE − deficit goal. Protein goal of about 1.6 g per kg body weight helps keep muscle in a deficit. Update your weight as it changes and the numbers follow.</p>
       </section>
 
       <section class="panel" aria-label="Last 14 days">
@@ -281,6 +324,11 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
           <button class="btn" id="csv-check" type="button">Check CSV</button>
         </details>
         <div id="import-preview" hidden></div>
+        <details id="mine-wrap">
+          <summary id="mine-sum">My foods</summary>
+          <p class="formula">Foods you saved while adding. Values are per 100 g, or per serving.</p>
+          <div class="mine-list" id="mine-list"></div>
+        </details>
       </section>
     </div>
   </div>
@@ -289,13 +337,14 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
 <script>
 (() => {
   const ACT = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, extra: 1.9 };
-  const DEFAULT_PROFILE = { heightFt: 5, heightIn: 10, weightLb: 136, age: 47, sex: "female", activity: "light", deficit: 432 };
+  const DEFAULT_PROFILE = { heightFt: 5, heightIn: 10, weightLb: 136, age: 47, sex: "female", activity: "light", deficit: 432, proteinGoal: 100 };
   const MEALS = ["breakfast", "lunch", "dinner", "snack", "other"];
   const MEAL_LABEL = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", other: "Other / day summary" };
   const LS_KEY = "deficit-diary-v1";
 
   let profile = { ...DEFAULT_PROFILE };
-  let days = {};            // "YYYY-MM-DD" -> [{id, name, kcal, meal, t}]
+  let days = {};
+  let myFoods = [];          // [{id, n, k, p, serving?, liquid?}] k/p per 100 g/ml, or per serving            // "YYYY-MM-DD" -> [{id, name, kcal, meal, t}]
   let selected = dayKey(new Date());
 
   const $ = (id) => document.getElementById(id);
@@ -314,6 +363,9 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     const goal = Math.max(bmr, tdee - (p.deficit || 0));
     return { bmr: Math.round(bmr), tdee: Math.round(tdee), goal: Math.round(goal), bmi: kg / ((cm / 100) ** 2) };
   }
+  const psum = (entries) => (entries || []).reduce((a, e) => a + (Number(e.protein) || 0), 0);
+  const hasProt = (entries) => (entries || []).some((e) => Number.isFinite(Number(e.protein)) && e.protein !== undefined && e.protein !== null && e.protein !== "");
+  const fmt1 = (n) => (Math.round(n * 10) / 10).toLocaleString("en-US");
   const sum = (entries) => (entries || []).reduce((a, e) => a + (Number(e.kcal) || 0), 0);
   function classify(total, c, hasEntries) {
     if (!hasEntries) return "empty";
@@ -329,7 +381,8 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     $("s-bmr").innerHTML = `${fmt(c.bmr)} <small>kcal</small>`;
     $("s-tdee").innerHTML = `${fmt(c.tdee)} <small>kcal</small>`;
     $("s-goal").innerHTML = `${fmt(c.goal)} <small>kcal</small>`;
-    $("s-bmi").innerHTML = `${c.bmi.toFixed(1)} <small>${c.bmi < 18.5 ? "underweight" : c.bmi < 25 ? "healthy range" : c.bmi < 30 ? "overweight" : "obese range"}</small>`;
+    $("s-prot").innerHTML = `${fmt(profile.proteinGoal)} <small>g · ${(profile.proteinGoal / (profile.weightLb * 0.45359237)).toFixed(1)} g/kg</small>`;
+    $("s-bmi").textContent = `BMI ${c.bmi.toFixed(1)} (${c.bmi < 18.5 ? "underweight" : c.bmi < 25 ? "healthy range" : c.bmi < 30 ? "overweight" : "obese range"}).`;
     $("hdr-range").textContent = `Safe deficit zone: ${fmt(c.bmr)}–${fmt(c.tdee)} kcal`;
   }
 
@@ -386,6 +439,13 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     box.append(s1, s2);
     box.setAttribute("role", st === "low" ? "alert" : "status");
 
+    // protein
+    const prot = psum(entries), pg = profile.proteinGoal || 0;
+    $("prot-num").textContent = `${fmt(prot)} / ${fmt(pg)} g`;
+    $("pbar").className = "pbar" + (pg && prot >= pg ? " done" : "");
+    $("pbar").firstElementChild.style.width = (pg ? Math.min(100, (prot / pg) * 100) : 0) + "%";
+    $("prot-hint").textContent = !entries.length ? "Add protein with each food to track it." : pg && prot >= pg ? "Protein goal reached." : `${fmt(pg - prot)} g to go.` + (entries.some((e) => !hasProt([e])) ? " Some items have no protein entered." : "");
+
     // entries
     const wrap = $("entries");
     wrap.innerHTML = "";
@@ -403,16 +463,17 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
         const g = document.createElement("div"); g.className = "meal-group";
         const h = document.createElement("div"); h.className = "meal-head";
         const hl = document.createElement("span"); hl.textContent = MEAL_LABEL[meal];
-        const hr = document.createElement("span"); hr.className = "num"; hr.textContent = fmt(sum(items)) + " kcal";
+        const hr = document.createElement("span"); hr.className = "num"; hr.textContent = fmt(sum(items)) + " kcal" + (hasProt(items) ? ` · ${fmt(psum(items))} g protein` : "");
         h.append(hl, hr); g.append(h);
         for (const it of items) {
           const row = document.createElement("div"); row.className = "entry";
           const n = document.createElement("span"); n.className = "name"; n.textContent = it.name;
           const k = document.createElement("span"); k.className = "num"; k.textContent = fmt(it.kcal);
+          const pgEl = document.createElement("span"); pgEl.className = "num pg"; pgEl.textContent = hasProt([it]) ? `${fmt1(it.protein)} g` : "";
           const del = document.createElement("button"); del.className = "del"; del.textContent = "×";
           del.setAttribute("aria-label", `Remove ${it.name}`);
           del.onclick = () => saveDay(selected, (days[selected] || []).filter((x) => x.id !== it.id));
-          row.append(n, k, del); g.append(row);
+          row.append(n, pgEl, k, del); g.append(row);
         }
         list.append(g);
       }
@@ -432,7 +493,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
       b.append(e.name);
       const n = document.createElement("span"); n.className = "num"; n.textContent = fmt(e.kcal);
       b.append(n);
-      b.onclick = () => addEntry(e.name, e.kcal, $("f-meal").value);
+      b.onclick = () => addEntry(e.name, e.kcal, $("f-meal").value, e.protein);
       box.append(b);
     }
   }
@@ -473,13 +534,14 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     const sumDef = last7.reduce((a, t) => a + (c.tdee - t.total), 0);
     const avg = last7.length ? last7.reduce((a, t) => a + t.total, 0) / last7.length : 0;
     const under = last7.filter((t) => t.total < c.bmr).length;
+    const protDays = last7.map((t) => t.k).filter((k) => hasProt(days[k]));
     const rows = [
       ["Days logged (7d)", `${last7.length} / 7`],
       ["Avg intake", last7.length ? `${fmt(avg)} kcal` : "–"],
+      ["Avg protein", protDays.length ? `${fmt(protDays.reduce((a, k) => a + psum(days[k]), 0) / protDays.length)} g` : "–"],
       ["Total deficit", last7.length ? `${fmt(sumDef)} kcal` : "–"],
       ["Est. change", last7.length ? `${sumDef >= 0 ? "−" : "+"}${Math.abs(sumDef / 3500).toFixed(2)} lb` : "–"],
       ["Days under BMR", `${under}`],
-      ["Avg daily deficit", last7.length ? `${fmt(sumDef / last7.length)} kcal` : "–"],
     ];
     $("summary").innerHTML = "";
     for (const [k, v] of rows) {
@@ -492,18 +554,18 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
   }
 
   function fillProfileInputs() {
-    const map = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-sex": "sex", "pf-act": "activity", "pf-def": "deficit" };
+    const map = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-sex": "sex", "pf-act": "activity", "pf-def": "deficit", "pf-prot": "proteinGoal" };
     for (const [id, key] of Object.entries(map)) { const el = $(id); if (document.activeElement !== el) el.value = profile[key]; }
   }
 
-  function renderAll() { renderNumbers(); renderDay(); renderRecent(); renderHistory(); fillProfileInputs(); }
+  function renderAll() { renderNumbers(); renderDay(); renderRecent(); renderHistory(); fillProfileInputs(); if (typeof renderMine === "function") renderMine(); }
 
   // ---------- storage ----------
   function showNote(text) { $("storage-note").textContent = text; $("storage-note").hidden = !text; }
 
-  function lsLoad() { try { const v = JSON.parse(localStorage.getItem(LS_KEY) || "null"); if (v) { profile = { ...DEFAULT_PROFILE, ...v.profile }; days = v.days || {}; } } catch {} }
+  function lsLoad() { try { const v = JSON.parse(localStorage.getItem(LS_KEY) || "null"); if (v) { profile = { ...DEFAULT_PROFILE, ...v.profile }; days = v.days || {}; myFoods = Array.isArray(v.myFoods) ? v.myFoods : []; } } catch {} }
   function lsSave() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ profile, days })); showNote(""); }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ profile, days, myFoods })); showNote(""); }
     catch { showNote("Couldn't save to this device. Free up some storage, then export a backup."); }
   }
 
@@ -520,21 +582,249 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     profileTimer = setTimeout(lsSave, 400);
   }
 
-  function addEntry(name, kcal, meal) {
+  function addEntry(name, kcal, meal, protein) {
     const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: String(name).trim().slice(0, 120), kcal: Math.max(0, Math.round(Number(kcal))), meal, t: Date.now() };
     if (!entry.name || !Number.isFinite(entry.kcal)) return;
+    const pr = parseFloat(protein); if (Number.isFinite(pr) && pr >= 0) entry.protein = Math.round(pr * 10) / 10;
     saveDay(selected, [...(days[selected] || []), entry]);
   }
+
+  // Built-in foods. Values per 100 g (or 100 ml for drinks): [name, English/alias, kcal, protein g, unit label, unit grams, liquid]
+  // Sources: USDA FoodData Central and Taiwan FDA food composition tables, rounded. Cooked weights unless marked 乾 (dry).
+  const FOOD_DATA = [
+    // Protein
+    ["熟雞胸肉", "chicken breast cooked", 165, 31],
+    ["雞腿肉(去皮,熟)", "chicken thigh skinless cooked", 209, 26],
+    ["豬里肌/腰內肉(熟)", "pork loin tenderloin cooked", 143, 26],
+    ["烤豬肋排(去骨)", "pork ribs boneless cooked", 260, 24],
+    ["瘦牛肉(熟)", "lean beef cooked", 217, 26],
+    ["牛腱(熟)", "beef shank cooked", 200, 31],
+    ["鮭魚(熟)", "salmon cooked", 206, 22],
+    ["白肉魚/鯛魚(熟)", "white fish tilapia cooked", 128, 26],
+    ["鯖魚(熟)", "mackerel cooked", 262, 24],
+    ["鮪魚罐頭(水煮)", "tuna canned in water", 116, 26],
+    ["蝦仁(熟)", "shrimp cooked", 99, 24],
+    ["雞蛋", "egg whole", 143, 12.6, "顆", 50],
+    ["水煮蛋", "boiled egg", 155, 12.6, "顆", 50],
+    ["茶葉蛋", "tea egg", 155, 12.6, "顆", 50],
+    ["荷包蛋/煎蛋", "fried egg", 196, 13.6, "顆", 50],
+    ["蛋白", "egg white", 52, 10.9, "顆份", 33],
+    ["板豆腐", "firm tofu", 88, 8.5],
+    ["嫩豆腐", "silken tofu", 51, 4.9],
+    ["煎豆腐", "pan-fried tofu", 120, 9],
+    ["豆干", "dried tofu", 160, 17],
+    ["毛豆", "edamame", 122, 11],
+    ["希臘優格(無脂)", "greek yogurt nonfat plain", 59, 10.3, "盒", 150],
+    ["希臘優格(2%)", "greek yogurt 2% plain", 73, 10, "盒", 150],
+    ["原味優格", "plain yogurt", 61, 3.5, "盒", 150],
+    ["全脂牛奶", "whole milk", 62, 3.3, "杯", 240, 1],
+    ["低脂牛奶", "low fat milk", 46, 3.3, "杯", 240, 1],
+    ["無糖豆漿", "soy milk unsweetened", 35, 3.6, "杯", 240, 1],
+    ["含糖豆漿", "soy milk sweetened", 60, 3.3, "杯", 240, 1],
+    ["起司片", "cheese slice", 290, 18, "片", 20],
+    ["Havarti 起司", "havarti cheese", 380, 21],
+    ["莫札瑞拉起司", "mozzarella", 280, 28],
+    ["膠原蛋白粉", "collagen powder", 350, 90, "匙", 10],
+    ["乳清蛋白粉", "whey protein powder", 400, 80, "匙", 30],
+    ["黃豆(乾)", "soybeans dry", 400, 36],
+    ["黑豆(乾)", "black soybeans dry", 380, 35],
+    // Grains & starches
+    ["白飯", "white rice cooked", 140, 2.6, "碗", 160],
+    ["糙米飯", "brown rice cooked", 125, 2.7, "碗", 160],
+    ["黑米飯", "black rice cooked", 145, 3.5, "碗", 160],
+    ["五穀飯", "multigrain rice cooked", 140, 3.5, "碗", 160],
+    ["小米(乾)", "millet dry", 378, 11],
+    ["燕麥片(乾)", "oats dry", 379, 13],
+    ["地瓜(蒸/烤)", "sweet potato", 90, 2],
+    ["馬鈴薯(蒸)", "potato", 87, 1.9],
+    ["日本南瓜(蒸)", "kabocha squash", 60, 1.4],
+    ["南瓜(蒸)", "pumpkin", 50, 1.5],
+    ["玉米", "corn", 96, 3.4, "根", 150],
+    ["全麥吐司", "whole wheat bread", 250, 12, "片", 35],
+    ["白吐司", "white bread", 270, 9, "片", 35],
+    ["貝果(原味)", "plain bagel", 257, 10, "個", 100],
+    ["饅頭", "steamed bun mantou", 230, 7.5, "個", 100],
+    ["麵條(熟)", "noodles cooked", 138, 4.5],
+    ["冬粉(熟)", "glass noodles cooked", 82, 0.1],
+    ["義大利麵(熟)", "pasta cooked", 158, 5.8],
+    ["紅豆(煮熟,無糖)", "red beans cooked", 128, 7.5],
+    ["蘇打餅乾", "crackers", 430, 9],
+    // Vegetables
+    ["綠花椰菜", "broccoli", 34, 2.8],
+    ["高麗菜", "cabbage", 23, 1.3],
+    ["菠菜", "spinach", 23, 2.9],
+    ["芝麻菜", "arugula", 25, 2.6],
+    ["綜合生菜", "mixed salad greens lettuce", 15, 1.3, "碗", 50],
+    ["地瓜葉", "sweet potato leaves", 28, 3.3],
+    ["清炒青菜(含油)", "stir-fried vegetables with oil", 45, 1.4],
+    ["紅蘿蔔", "carrot", 41, 0.9],
+    ["番茄", "tomato", 18, 0.9, "顆", 120],
+    ["小番茄", "cherry tomatoes", 30, 0.9],
+    ["小黃瓜", "cucumber", 15, 0.7, "條", 100],
+    ["青椒/甜椒", "bell pepper", 22, 0.9],
+    ["洋蔥", "onion", 40, 1.1],
+    ["茄子", "eggplant", 25, 1],
+    ["四季豆", "green beans", 31, 1.8],
+    ["蘆筍", "asparagus", 20, 2.2],
+    ["菇類(鴻喜菇/香菇)", "mushrooms", 26, 2.5],
+    ["櫛瓜", "zucchini", 17, 1.2],
+    // Fruit
+    ["香蕉", "banana", 89, 1.1, "根", 100],
+    ["蘋果", "apple", 52, 0.3, "顆", 180],
+    ["甜柿/柿子", "persimmon", 70, 0.6, "顆", 150],
+    ["芭樂", "guava", 40, 0.8, "顆", 200],
+    ["奇異果", "kiwi", 61, 1.1, "顆", 75],
+    ["橘子", "mandarin orange", 53, 0.8, "顆", 100],
+    ["柳丁", "orange", 47, 0.9, "顆", 130],
+    ["黃桃", "yellow peach", 39, 0.9, "顆", 150],
+    ["藍莓", "blueberries", 57, 0.7],
+    ["草莓", "strawberries", 32, 0.7],
+    ["葡萄", "grapes", 69, 0.7],
+    ["木瓜", "papaya", 43, 0.5],
+    ["鳳梨", "pineapple", 50, 0.5],
+    ["西瓜", "watermelon", 30, 0.6],
+    ["酪梨", "avocado", 160, 2, "顆", 150],
+    // Fats & nuts
+    ["核桃", "walnuts", 654, 15],
+    ["杏仁", "almonds", 579, 21],
+    ["腰果", "cashews", 553, 18],
+    ["花生", "peanuts", 567, 26],
+    ["黑芝麻", "black sesame", 573, 17.7],
+    ["花生醬", "peanut butter", 588, 25, "大匙", 16],
+    ["橄欖油/食用油", "olive oil cooking oil", 884, 0, "大匙", 13],
+    // Drinks & snacks
+    ["Flat White", "flat white coffee", 50, 2.5, "杯", 240, 1],
+    ["拿鐵(全脂)", "latte whole milk", 54, 2.9, "杯", 350, 1],
+    ["抹茶拿鐵", "matcha latte", 58, 2.1, "杯", 240, 1],
+    ["美式咖啡/黑咖啡", "americano black coffee", 2, 0.1, "杯", 350, 1],
+    ["洋芋片", "potato chips", 536, 7, "小包", 38],
+    ["黑巧克力(70%)", "dark chocolate", 598, 7.8],
+    ["蔬菜蛋炒肉", "stir-fried pork egg vegetables", 150, 10],
+  ];
+
+  const FOODS = FOOD_DATA.map(([n, en, k, p, ul, ug, liquid]) => ({ n, en, k, p, ul, ug, liquid: !!liquid }));
+  let picked = null;
+  let activeIdx = -1;
+
+  function unitsFor(f) {
+    if (!f) return [{ l: "g", m: 0 }, { l: "ml", m: 0 }, { l: "份 serving", m: 0 }];
+    if (f.serving) return [{ l: "份 serving", m: 1 }];
+    const u = [{ l: f.liquid ? "ml" : "g", m: 0.01 }];
+    if (f.ul) u.unshift({ l: f.ul, m: f.ug / 100 });
+    return u;
+  }
+  function setUnits(f) {
+    const sel = $("f-unit"); sel.innerHTML = "";
+    unitsFor(f).forEach((u, i) => { const o = document.createElement("option"); o.value = i; o.textContent = u.l + (f && f.ul === u.l ? ` (${f.ug}${f.liquid ? "ml" : "g"})` : ""); sel.append(o); });
+  }
+  function perLabel(f) { return f.serving ? `${fmt(f.k)} kcal · ${fmt1(f.p)} g / serving` : `${fmt(f.k)} kcal · ${fmt1(f.p)} g / 100${f.liquid ? "ml" : "g"}`; }
+  function allFoods() { return [...myFoods.map((f) => ({ ...f, mine: true })), ...FOODS]; }
+  function search(q) {
+    q = q.trim().toLowerCase(); if (!q) return [];
+    const scored = [];
+    for (const f of allFoods()) {
+      const n = f.n.toLowerCase(), en = (f.en || "").toLowerCase();
+      let s = n.startsWith(q) ? 0 : n.includes(q) ? 1 : en.split(/[\s,/]+/).some((w) => w.startsWith(q)) ? 2 : en.includes(q) ? 3 : -1;
+      if (s < 0 && q.length >= 2 && [...q].every((ch) => n.includes(ch))) s = 4;
+      if (s >= 0) scored.push([s - (f.mine ? 0.5 : 0), f]);
+    }
+    return scored.sort((a, b) => a[0] - b[0]).slice(0, 8).map((x) => x[1]);
+  }
+  function closeSuggest() { $("suggest").hidden = true; $("f-name").setAttribute("aria-expanded", "false"); activeIdx = -1; }
+  function renderSuggest() {
+    const list = search($("f-name").value), ul = $("suggest");
+    ul.innerHTML = "";
+    if (!list.length) return closeSuggest();
+    list.forEach((f, i) => {
+      const li = document.createElement("li"); li.setAttribute("role", "option");
+      const b = document.createElement("button"); b.type = "button"; if (i === activeIdx) b.className = "active";
+      const sn = document.createElement("span"); sn.className = "sn"; sn.textContent = f.n;
+      if (f.mine) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "mine"; sn.append(t); }
+      const se = document.createElement("span"); se.className = "se"; se.textContent = f.en || "";
+      const sv = document.createElement("span"); sv.className = "sv"; sv.textContent = perLabel(f);
+      b.append(sn, sv, se);
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.onclick = () => pick(f);
+      li.append(b); ul.append(li);
+    });
+    ul.hidden = false; $("f-name").setAttribute("aria-expanded", "true");
+  }
+  function pick(f) {
+    picked = f;
+    $("f-name").value = f.n;
+    setUnits(f);
+    $("f-amt").value = f.serving || f.ul ? 1 : 100;
+    $("save-wrap").hidden = true; $("f-save").checked = false;
+    closeSuggest(); compute();
+    $("f-amt").focus(); $("f-amt").select();
+  }
+  function compute() {
+    if (!picked) { $("f-per").textContent = ""; return; }
+    const u = unitsFor(picked)[+$("f-unit").value || 0];
+    const amt = parseFloat($("f-amt").value);
+    if (!Number.isFinite(amt) || amt <= 0) { $("f-per").textContent = perLabel(picked); return; }
+    const kcal = Math.round(amt * u.m * picked.k), prot = Math.round(amt * u.m * picked.p * 10) / 10;
+    $("f-kcal").value = kcal; $("f-prot").value = prot;
+    $("f-per").textContent = `${perLabel(picked)}  →  ${fmt(kcal)} kcal · ${fmt1(prot)} g protein`;
+  }
+  function resetForm() {
+    picked = null; setUnits(null);
+    for (const id of ["f-name", "f-amt", "f-kcal", "f-prot"]) $(id).value = "";
+    $("f-per").textContent = ""; $("save-wrap").hidden = true; $("f-save").checked = false;
+  }
+  function renderMine() {
+    $("mine-sum").textContent = `My foods (${myFoods.length})`;
+    const box = $("mine-list"); box.innerHTML = "";
+    if (!myFoods.length) { const e = document.createElement("div"); e.className = "formula"; e.textContent = "None yet. When you add a food that isn't in the list, tick “Save to My foods”."; box.append(e); return; }
+    for (const f of myFoods) {
+      const row = document.createElement("div"); row.className = "entry";
+      const n = document.createElement("span"); n.className = "name"; n.textContent = f.n;
+      const v = document.createElement("span"); v.className = "num pg"; v.textContent = perLabel(f);
+      const del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label", `Remove ${f.n} from My foods`);
+      del.onclick = () => { myFoods = myFoods.filter((x) => x !== f); lsSave(); renderMine(); };
+      row.append(n, v, del); box.append(row);
+    }
+  }
+
+  $("f-name").addEventListener("input", () => {
+    if (picked && $("f-name").value !== picked.n) { picked = null; setUnits(null); $("f-per").textContent = ""; }
+    activeIdx = -1; renderSuggest();
+    $("save-wrap").hidden = picked !== null || !$("f-name").value.trim();
+  });
+  $("f-name").addEventListener("keydown", (e) => {
+    const items = $("suggest").querySelectorAll("button");
+    if ($("suggest").hidden || !items.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); activeIdx = (activeIdx + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length; renderSuggest(); }
+    else if (e.key === "Enter" && activeIdx >= 0) { e.preventDefault(); items[activeIdx].click(); }
+    else if (e.key === "Escape") closeSuggest();
+  });
+  $("f-name").addEventListener("blur", () => setTimeout(closeSuggest, 150));
+  $("f-name").addEventListener("focus", () => { if (!picked && $("f-name").value) renderSuggest(); });
+  $("f-amt").addEventListener("input", compute);
+  $("f-unit").addEventListener("change", compute);
+  setUnits(null);
 
   // ---------- events ----------
   $("add-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    addEntry($("f-name").value, $("f-kcal").value, $("f-meal").value);
-    $("f-name").value = ""; $("f-kcal").value = ""; $("f-name").focus();
+    const name = $("f-name").value.trim(), kcal = parseFloat($("f-kcal").value), prot = parseFloat($("f-prot").value);
+    const amt = parseFloat($("f-amt").value);
+    const unit = unitsFor(picked)[+$("f-unit").value || 0];
+    const unitText = unit.l.split(" ")[0];
+    const label = Number.isFinite(amt) && amt > 0 ? `${name} · ${fmt1(amt)}${unitText}` : name;
+    if (!picked && $("f-save").checked && Number.isFinite(kcal)) {
+      const p0 = Number.isFinite(prot) ? prot : 0;
+      const f = unitText === "g" || unitText === "ml"
+        ? (Number.isFinite(amt) && amt > 0 ? { n: name, k: Math.round(kcal / amt * 1000) / 10, p: Math.round(p0 / amt * 1000) / 10, liquid: unitText === "ml" } : null)
+        : { n: name, k: Math.round(kcal / (amt > 0 ? amt : 1)), p: Math.round(p0 / (amt > 0 ? amt : 1) * 10) / 10, serving: true };
+      if (f) { f.id = "my" + Date.now().toString(36); myFoods = myFoods.filter((x) => x.n !== f.n); myFoods.unshift(f); renderMine(); }
+    }
+    addEntry(label, kcal, $("f-meal").value, prot);
+    resetForm(); $("f-name").focus();
   });
   $("prev").onclick = () => { selected = addDays(selected, -1); renderAll(); };
   $("next").onclick = () => { if (selected < today()) { selected = addDays(selected, 1); renderAll(); } };
-  const numFields = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-def": "deficit" };
+  const numFields = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-def": "deficit", "pf-prot": "proteinGoal" };
   for (const [id, key] of Object.entries(numFields)) $(id).addEventListener("input", (e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) { profile[key] = v; saveProfile(); } });
   $("pf-sex").addEventListener("change", (e) => { profile.sex = e.target.value; saveProfile(); });
   $("pf-act").addEventListener("change", (e) => { profile.activity = e.target.value; saveProfile(); });
@@ -600,6 +890,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     ok.onclick = () => {
       Object.assign(days, pending.days || {});
       if (pending.profile) profile = { ...DEFAULT_PROFILE, ...pending.profile };
+      for (const f of pending.myFoods || []) { myFoods = myFoods.filter((x) => x.n !== f.n); myFoods.push(f); }
       lsSave(); renderAll();
       box.className = "preview"; box.textContent = `Imported ${keys.length} day${keys.length === 1 ? "" : "s"}.`;
       $("csv-text").value = ""; pending = null;
@@ -616,7 +907,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
         if (!v || typeof v.days !== "object") throw 0;
         const clean = {};
         for (const [k, list] of Object.entries(v.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Array.isArray(list)) clean[k] = list.filter((e) => e && e.name && Number.isFinite(Number(e.kcal)));
-        return showPreview({ days: clean, profile: v.profile && typeof v.profile === "object" ? v.profile : null });
+        return showPreview({ days: clean, profile: v.profile && typeof v.profile === "object" ? v.profile : null, myFoods: Array.isArray(v.myFoods) ? v.myFoods.filter((f) => f && f.n && Number.isFinite(Number(f.k))) : [] });
       } catch { return showPreview({ days: {} }); }
     }
     showPreview(fromCSV(t));
@@ -628,7 +919,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     handleText(await f.text(), f.name); e.target.value = "";
   });
   $("export").onclick = () => {
-    const blob = new Blob([JSON.stringify({ app: "deficit-diary", version: 1, exported: new Date().toISOString(), profile, days }, null, 1)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ app: "deficit-diary", version: 1, exported: new Date().toISOString(), profile, days, myFoods }, null, 1)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = `deficit-diary-backup-${today()}.json`;
     document.body.append(a); a.click(); a.remove();
