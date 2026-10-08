@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6f8b">
+<meta name="description" content="Daily food log that tracks calories against your BMR and TDEE.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Deficit Diary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-column workbench — today's log on the left, body numbers + history on the right; stacks on phones */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #17201e;
+  --muted: #5d6a67;
+  --line: #dfe5e3;
+  --accent: #1f6f8b;
+  --accent-soft: #e2eff4;
+  --low: #c0392b;
+  --low-soft: #fbe9e6;
+  --good: #2e7d4f;
+  --good-soft: #e5f3ea;
+  --over: #b26a00;
+  --over-soft: #fbf0dc;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111716; --surface: #19211f; --ink: #e7eeec; --muted: #94a3a0; --line: #2a3533;
+    --accent: #5fb3cf; --accent-soft: #1a3039;
+    --low: #f07565; --low-soft: #3a1f1c; --good: #5cc488; --good-soft: #1a3226; --over: #e7a640; --over-soft: #382a14;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111716; --surface: #19211f; --ink: #e7eeec; --muted: #94a3a0; --line: #2a3533;
+  --accent: #5fb3cf; --accent-soft: #1a3039;
+  --low: #f07565; --low-soft: #3a1f1c; --good: #5cc488; --good-soft: #1a3226; --over: #e7a640; --over-soft: #382a14;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 48px; display: grid; gap: 24px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+h1 { font: 700 30px/1.1 var(--font-display); letter-spacing: -0.01em; margin: 0; }
+h2 { font: 600 13px/1.2 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+.sub { color: var(--muted); margin: 0; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: grid; gap: 24px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.notice { font-size: 13px; color: var(--muted); background: var(--accent-soft); border-radius: 8px; padding: 8px 12px; }
+
+/* Day nav */
+.daynav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.daynav .label { font: 700 22px/1.2 var(--font-display); text-align: center; flex: 1; }
+.daynav .label small { display: block; font: 400 13px var(--font-body); color: var(--muted); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.iconbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 18px; line-height: 1; }
+.iconbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.iconbtn:disabled { opacity: 0.35; cursor: default; }
+.linkbtn { border: 0; background: none; color: var(--accent); padding: 0; font-size: 13px; font-weight: 500; }
+
+/* Total + gauge */
+.total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+.total .big { font: 700 52px/1 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.total .unit { color: var(--muted); }
+.gauge { position: relative; height: 14px; border-radius: 7px; overflow: hidden; background: var(--line); }
+.gauge .zone { position: absolute; top: 0; bottom: 0; }
+.gauge .fill { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 4px; background: var(--ink); transition: width .3s ease; }
+.marks { position: relative; height: 34px; font-size: 11px; color: var(--muted); }
+.marks span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; text-align: center; line-height: 1.25; }
+.marks span::before { content: ""; display: block; width: 1px; height: 6px; background: var(--muted); margin: 0 auto 2px; }
+.marks span.end { transform: translateX(calc(-100% + 0.5px)); text-align: right; }
+.marks span.end::before { margin: 0 0 2px auto; }
+.marks span.start { transform: translateX(-0.5px); text-align: left; }
+.marks span.start::before { margin: 0 auto 2px 0; }
+.marks b { font-weight: 600; color: var(--ink); font-family: var(--font-mono); font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .gauge .fill { transition: none; } }
+
+.status { border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; border: 1px solid transparent; }
+.status strong { font-weight: 600; }
+.status.low { background: var(--low-soft); color: var(--low); border-color: color-mix(in srgb, var(--low) 30%, transparent); }
+.status.low strong::before { content: "⚠ "; }
+.status.good { background: var(--good-soft); color: var(--good); }
+.status.mid { background: var(--accent-soft); color: var(--accent); }
+.status.over { background: var(--over-soft); color: var(--over); }
+.status.empty { background: var(--bg); color: var(--muted); }
+.status span { color: var(--ink); font-size: 14px; }
+
+/* Add form */
+form.add { display: grid; grid-template-columns: minmax(0, 1fr) 96px 120px auto; gap: 8px; }
+@media (max-width: 560px) { form.add { grid-template-columns: minmax(0, 1fr) 96px; } form.add .meal, form.add .go { grid-column: span 1; } }
+input, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-width: 0; width: 100%; }
+input[type=number] { font-family: var(--font-mono); }
+.go { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
+:root[data-theme="dark"] .go { color: #0d1514; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .go { color: #0d1514; } }
+.go:hover { filter: brightness(1.08); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip .num { color: var(--muted); font-size: 12px; margin-left: 4px; }
+
+/* Entries */
+.meal-group { display: grid; gap: 2px; }
+.meal-head { display: flex; justify-content: space-between; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto 28px; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.entry .name { overflow-wrap: anywhere; }
+.entry .del { border: 0; background: none; color: var(--muted); font-size: 18px; width: 28px; height: 28px; border-radius: 6px; }
+.entry .del:hover { color: var(--low); background: var(--low-soft); }
+.empty-log { color: var(--muted); text-align: center; padding: 18px 8px; border: 1px dashed var(--line); border-radius: 10px; }
+
+/* Body numbers */
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.stat { display: grid; gap: 2px; padding: 12px; border-radius: 10px; background: var(--bg); }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font: 700 26px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.stat .v small { font: 400 12px var(--font-body); color: var(--muted); }
+.profile { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.profile label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.profile .wide { grid-column: span 3; }
+@media (max-width: 420px) { .profile { grid-template-columns: repeat(2, minmax(0, 1fr)); } .profile .wide { grid-column: span 2; } }
+.formula { font-size: 12px; color: var(--muted); margin: 0; }
+details summary { cursor: pointer; font-size: 13px; color: var(--accent); font-weight: 500; }
+details[open] summary { margin-bottom: 12px; }
+
+/* History */
+.chart-wrap { overflow-x: auto; }
+svg.chart { width: 100%; height: auto; display: block; min-width: 300px; }
+.chart .axis { fill: var(--muted); font: 10px var(--font-mono); }
+.chart .ref-bmr { stroke: var(--low); stroke-dasharray: 4 3; }
+.chart .ref-tdee { stroke: var(--muted); stroke-dasharray: 2 3; }
+.chart .ref-goal { stroke: var(--good); stroke-dasharray: 6 3; opacity: .7; }
+.chart .lbl-bmr { fill: var(--low); font: 600 10px var(--font-mono); }
+.chart .lbl-tdee { fill: var(--muted); font: 600 10px var(--font-mono); }
+.chart .lbl-goal { fill: var(--good); font: 600 10px var(--font-mono); }
+.chart .b-low { fill: var(--low); } .chart .b-good { fill: var(--good); } .chart .b-mid { fill: var(--accent); } .chart .b-over { fill: var(--over); }
+.chart .sel { fill: var(--accent-soft); }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart .base { stroke: var(--line); }
+.summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 14px; }
+.summary div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 4px 0; }
+.summary dt { color: var(--muted); } .summary dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+html { -webkit-text-size-adjust: 100%; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--bg); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { display: inline-flex; align-items: center; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 9px 14px; font-weight: 500; font-size: 14px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; min-width: 0; resize: vertical; margin-bottom: 8px; }
+.preview { display: grid; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; }
+.preview.err { background: var(--low-soft); color: var(--low); }
+.preview ul { margin: 0; padding-left: 18px; font-family: var(--font-mono); font-size: 12px; max-height: 160px; overflow: auto; }
+.install { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Deficit Diary</h1>
+      <p class="sub">Eat under your TDEE, never under your BMR.</p>
+    </div>
+    <div style="display:grid;gap:6px;justify-items:end"><p class="sub num" id="hdr-range"></p><button class="btn primary" id="install-btn" hidden>Install app</button></div>
+  </header>
+  <div class="notice" id="storage-note" hidden></div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-label="Day log">
+        <div class="daynav">
+          <button class="iconbtn" id="prev" aria-label="Previous day">‹</button>
+          <div class="label" id="day-label"></div>
+          <button class="iconbtn" id="next" aria-label="Next day">›</button>
+        </div>
+
+        <div class="total">
+          <span class="big" id="total">0</span>
+          <span class="unit">kcal eaten</span>
+          <span class="unit num" id="remaining"></span>
+        </div>
+        <div>
+          <div class="gauge" id="gauge"></div>
+          <div class="marks" id="marks"></div>
+        </div>
+        <div class="status empty" id="status"></div>
+      </section>
+
+      <section class="panel" aria-label="Add food">
+        <h2>Add food</h2>
+        <form class="add" id="add-form" autocomplete="off">
+          <input id="f-name" placeholder="Food, e.g. Greek yogurt + berries" required aria-label="Food">
+          <input id="f-kcal" type="number" inputmode="numeric" min="0" max="5000" placeholder="kcal" required aria-label="Calories">
+          <select id="f-meal" class="meal" aria-label="Meal">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snack">Snack</option>
+          </select>
+          <button class="go" type="submit">Add</button>
+        </form>
+        <div id="recent-wrap" hidden>
+          <h2 style="margin-bottom:8px">Recent · tap to add again</h2>
+          <div class="chips" id="recent"></div>
+        </div>
+        <div id="entries"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-label="Your numbers">
+        <h2>Your numbers</h2>
+        <div class="stats">
+          <div class="stat"><span class="k">BMR · at rest</span><span class="v" id="s-bmr">–</span></div>
+          <div class="stat"><span class="k">TDEE · maintenance</span><span class="v" id="s-tdee">–</span></div>
+          <div class="stat"><span class="k">Daily goal</span><span class="v" id="s-goal">–</span></div>
+          <div class="stat"><span class="k">BMI</span><span class="v" id="s-bmi">–</span></div>
+        </div>
+        <details>
+          <summary>Edit profile</summary>
+          <div class="profile">
+            <label>Height ft<input id="pf-ft" type="number" min="3" max="8"></label>
+            <label>Height in<input id="pf-in" type="number" min="0" max="11"></label>
+            <label>Weight lb<input id="pf-lb" type="number" min="60" max="600" step="0.1"></label>
+            <label>Age<input id="pf-age" type="number" min="15" max="100"></label>
+            <label>Sex<select id="pf-sex"><option value="female">Female</option><option value="male">Male</option></select></label>
+            <label>Deficit goal<input id="pf-def" type="number" min="0" max="1500" step="50"></label>
+            <label class="wide">Activity
+              <select id="pf-act">
+                <option value="sedentary">Sedentary · desk job, little exercise (×1.2)</option>
+                <option value="light">Light · exercise 1–3 days/week (×1.375)</option>
+                <option value="moderate">Moderate · exercise 3–5 days/week (×1.55)</option>
+                <option value="active">Very active · 6–7 days/week (×1.725)</option>
+                <option value="extra">Extra active · physical job + training (×1.9)</option>
+              </select>
+            </label>
+          </div>
+        </details>
+        <p class="formula">BMR uses Mifflin–St Jeor. TDEE = BMR × activity factor. Goal = TDEE − deficit goal. Update your weight as it changes and the numbers follow.</p>
+      </section>
+
+      <section class="panel" aria-label="Last 14 days">
+        <h2>Last 14 days</h2>
+        <div class="chart-wrap" id="chart"></div>
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>At or under goal</span>
+          <span><i style="background:var(--accent)"></i>Small deficit</span>
+          <span><i style="background:var(--over)"></i>Over TDEE</span>
+          <span><i style="background:var(--low)"></i>Under BMR</span>
+        </div>
+        <dl class="summary" id="summary"></dl>
+      </section>
+
+      <section class="panel" aria-label="Your data">
+        <h2>Your data</h2>
+        <p class="formula">Your log is saved on this device only. Export a backup now and then, and import it to move your log to another phone or browser.</p>
+        <div class="data-actions">
+          <button class="btn" id="export" type="button">Export backup</button>
+          <label class="btn" for="import-file">Import file</label>
+          <input type="file" id="import-file" accept=".json,.csv,text/csv,application/json,text/plain" hidden>
+        </div>
+        <details>
+          <summary>Paste CSV</summary>
+          <textarea id="csv-text" rows="6" placeholder="Date,Meal,Item,Weight_or_Qty,Calories_kcal,Protein_g&#10;2026-10-08,早餐,蒸日本南瓜,150g,90,2.1"></textarea>
+          <button class="btn" id="csv-check" type="button">Check CSV</button>
+        </details>
+        <div id="import-preview" hidden></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const ACT = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, extra: 1.9 };
+  const DEFAULT_PROFILE = { heightFt: 5, heightIn: 10, weightLb: 136, age: 47, sex: "female", activity: "light", deficit: 432 };
+  const MEALS = ["breakfast", "lunch", "dinner", "snack", "other"];
+  const MEAL_LABEL = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", other: "Other / day summary" };
+  const LS_KEY = "deficit-diary-v1";
+
+  let profile = { ...DEFAULT_PROFILE };
+  let days = {};            // "YYYY-MM-DD" -> [{id, name, kcal, meal, t}]
+  let selected = dayKey(new Date());
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Math.round(n).toLocaleString("en-US");
+
+  function dayKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+  function parseKey(k) { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); }
+  function addDays(k, n) { const d = parseKey(k); d.setDate(d.getDate() + n); return dayKey(d); }
+  const today = () => dayKey(new Date());
+
+  function calc(p) {
+    const kg = p.weightLb * 0.45359237;
+    const cm = (p.heightFt * 12 + p.heightIn) * 2.54;
+    const bmr = 10 * kg + 6.25 * cm - 5 * p.age + (p.sex === "male" ? 5 : -161);
+    const tdee = bmr * (ACT[p.activity] || 1.55);
+    const goal = Math.max(bmr, tdee - (p.deficit || 0));
+    return { bmr: Math.round(bmr), tdee: Math.round(tdee), goal: Math.round(goal), bmi: kg / ((cm / 100) ** 2) };
+  }
+  const sum = (entries) => (entries || []).reduce((a, e) => a + (Number(e.kcal) || 0), 0);
+  function classify(total, c, hasEntries) {
+    if (!hasEntries) return "empty";
+    if (total < c.bmr) return "low";
+    if (total <= c.goal) return "good";
+    if (total < c.tdee) return "mid";
+    return "over";
+  }
+
+  // ---------- rendering ----------
+  function renderNumbers() {
+    const c = calc(profile);
+    $("s-bmr").innerHTML = `${fmt(c.bmr)} <small>kcal</small>`;
+    $("s-tdee").innerHTML = `${fmt(c.tdee)} <small>kcal</small>`;
+    $("s-goal").innerHTML = `${fmt(c.goal)} <small>kcal</small>`;
+    $("s-bmi").innerHTML = `${c.bmi.toFixed(1)} <small>${c.bmi < 18.5 ? "underweight" : c.bmi < 25 ? "healthy range" : c.bmi < 30 ? "overweight" : "obese range"}</small>`;
+    $("hdr-range").textContent = `Safe deficit zone: ${fmt(c.bmr)}–${fmt(c.tdee)} kcal`;
+  }
+
+  function renderDay() {
+    const c = calc(profile);
+    const entries = days[selected] || [];
+    const total = sum(entries);
+    const isToday = selected === today();
+    const d = parseKey(selected);
+    const dateText = d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+    $("day-label").innerHTML = "";
+    $("day-label").append(isToday ? "Today" : dateText);
+    const small = document.createElement("small");
+    small.textContent = isToday ? dateText : (selected === addDays(today(), -1) ? "Yesterday" : d.getFullYear());
+    $("day-label").append(small);
+    $("next").disabled = selected >= today();
+
+    $("total").textContent = fmt(total);
+    const left = c.goal - total;
+    $("remaining").textContent = left > 0 ? `· ${fmt(left)} left to goal` : "";
+
+    // gauge
+    const max = Math.max(c.tdee * 1.15, total * 1.05);
+    const pct = (v) => Math.min(100, (v / max) * 100);
+    $("gauge").innerHTML =
+      `<div class="zone" style="left:0;width:${pct(c.bmr)}%;background:var(--low-soft)"></div>` +
+      `<div class="zone" style="left:${pct(c.bmr)}%;width:${pct(c.goal) - pct(c.bmr)}%;background:var(--good-soft)"></div>` +
+      `<div class="zone" style="left:${pct(c.goal)}%;width:${pct(c.tdee) - pct(c.goal)}%;background:var(--accent-soft)"></div>` +
+      `<div class="zone" style="left:${pct(c.tdee)}%;right:0;background:var(--over-soft)"></div>` +
+      `<div class="fill" style="width:${pct(total)}%"></div>`;
+    const marks = [["BMR", c.bmr], ["Goal", c.goal], ["TDEE", c.tdee]];
+    // when two marks sit close together, anchor the left one's label to the right of its tick and the next one's to the left
+    const close = marks.map((m, i) => i < marks.length - 1 && pct(marks[i + 1][1]) - pct(m[1]) < 16);
+    $("marks").innerHTML = marks.map(([l, v], i) => {
+      const cls = close[i] ? "end" : (i > 0 && close[i - 1]) ? "start" : "";
+      return `<span class="${cls}" style="left:${pct(v)}%">${l}<br><b>${fmt(v)}</b></span>`;
+    }).join("");
+
+    // status
+    const st = classify(total, c, entries.length > 0);
+    const deficit = c.tdee - total;
+    const box = $("status");
+    box.className = "status " + st;
+    const msg = {
+      empty: [`Nothing logged ${isToday ? "yet today" : "for this day"}`, `Aim for ${fmt(c.bmr)}–${fmt(c.tdee)} kcal. Your goal is ${fmt(c.goal)}.`],
+      low: [`Below your BMR by ${fmt(c.bmr - total)} kcal`, `Eating under ${fmt(c.bmr)} kcal can cost muscle and slow your metabolism. ${isToday ? `Add at least ${fmt(c.bmr - total)} kcal today.` : "Try to stay above it."}`],
+      good: [`On target · ${fmt(deficit)} kcal deficit`, `Between your BMR and your goal. About ${(deficit / 3500).toFixed(2)} lb of fat.`],
+      mid: [`${fmt(deficit)} kcal deficit`, `Still under maintenance, ${fmt(total - c.goal)} kcal above your goal.`],
+      over: [`No deficit · ${fmt(total - c.tdee)} kcal over TDEE`, `You ate at or above maintenance (${fmt(c.tdee)} kcal).`],
+    }[st];
+    box.innerHTML = "";
+    const s1 = document.createElement("strong"); s1.textContent = msg[0];
+    const s2 = document.createElement("span"); s2.textContent = msg[1];
+    box.append(s1, s2);
+    box.setAttribute("role", st === "low" ? "alert" : "status");
+
+    // entries
+    const wrap = $("entries");
+    wrap.innerHTML = "";
+    if (!entries.length) {
+      const e = document.createElement("div");
+      e.className = "empty-log";
+      e.textContent = "Your meals for this day will appear here. Add the first one above.";
+      wrap.append(e);
+    } else {
+      const list = document.createElement("div");
+      list.style.display = "grid"; list.style.gap = "16px";
+      for (const meal of MEALS) {
+        const items = entries.filter((e) => (MEALS.includes(e.meal) ? e.meal : "other") === meal);
+        if (!items.length) continue;
+        const g = document.createElement("div"); g.className = "meal-group";
+        const h = document.createElement("div"); h.className = "meal-head";
+        const hl = document.createElement("span"); hl.textContent = MEAL_LABEL[meal];
+        const hr = document.createElement("span"); hr.className = "num"; hr.textContent = fmt(sum(items)) + " kcal";
+        h.append(hl, hr); g.append(h);
+        for (const it of items) {
+          const row = document.createElement("div"); row.className = "entry";
+          const n = document.createElement("span"); n.className = "name"; n.textContent = it.name;
+          const k = document.createElement("span"); k.className = "num"; k.textContent = fmt(it.kcal);
+          const del = document.createElement("button"); del.className = "del"; del.textContent = "×";
+          del.setAttribute("aria-label", `Remove ${it.name}`);
+          del.onclick = () => saveDay(selected, (days[selected] || []).filter((x) => x.id !== it.id));
+          row.append(n, k, del); g.append(row);
+        }
+        list.append(g);
+      }
+      wrap.append(list);
+    }
+  }
+
+  function renderRecent() {
+    const seen = new Map();
+    const all = Object.values(days).flat().sort((a, b) => (b.t || 0) - (a.t || 0));
+    for (const e of all) { if (e.meal === "other") continue; const k = e.name.trim().toLowerCase(); if (!seen.has(k)) seen.set(k, e); if (seen.size >= 10) break; }
+    const box = $("recent");
+    box.innerHTML = "";
+    $("recent-wrap").hidden = seen.size === 0;
+    for (const e of seen.values()) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip";
+      b.append(e.name);
+      const n = document.createElement("span"); n.className = "num"; n.textContent = fmt(e.kcal);
+      b.append(n);
+      b.onclick = () => addEntry(e.name, e.kcal, $("f-meal").value);
+      box.append(b);
+    }
+  }
+
+  function renderHistory() {
+    const c = calc(profile);
+    const keys = []; for (let i = 13; i >= 0; i--) keys.push(addDays(today(), -i));
+    const totals = keys.map((k) => ({ k, total: sum(days[k]), has: (days[k] || []).length > 0 }));
+    const W = 640, H = 210, L = 8, R = 52, T = 10, B = 26;
+    const max = Math.max(c.tdee * 1.2, ...totals.map((t) => t.total * 1.08));
+    const y = (v) => T + (H - T - B) * (1 - v / max);
+    const bw = (W - L - R) / keys.length;
+    let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily calories for the last 14 days">`;
+    totals.forEach((t, i) => { if (t.k === selected) s += `<rect class="sel" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}" rx="4"/>`; });
+    s += `<line class="base" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>`;
+    totals.forEach((t, i) => {
+      if (t.has) {
+        const cls = "b-" + classify(t.total, c, true);
+        s += `<rect class="${cls}" x="${L + i * bw + bw * 0.2}" y="${y(t.total)}" width="${bw * 0.6}" height="${Math.max(1, y(0) - y(t.total))}" rx="2"><title>${t.k}: ${fmt(t.total)} kcal</title></rect>`;
+      }
+      const d = parseKey(t.k);
+      s += `<text class="axis" x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle">${d.getDate()}</text>`;
+      s += `<rect class="hit" data-k="${t.k}" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T}"><title>${t.k}</title></rect>`;
+    });
+    for (const [cls, v, lbl] of [["tdee", c.tdee, "TDEE"], ["goal", c.goal, "Goal"], ["bmr", c.bmr, "BMR"]]) {
+      s += `<line class="ref-${cls}" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
+    }
+    // stagger labels if they collide
+    const labels = [["tdee", c.tdee, "TDEE"], ["goal", c.goal, "Goal"], ["bmr", c.bmr, "BMR"]].map(([cls, v, l]) => ({ cls, l, v, yy: y(v) + 3 }));
+    for (let i = 1; i < labels.length; i++) if (labels[i].yy - labels[i - 1].yy < 11) labels[i].yy = labels[i - 1].yy + 11;
+    for (const lb of labels) s += `<text class="lbl-${lb.cls}" x="${W - R + 6}" y="${lb.yy}">${lb.l}</text>`;
+    s += `</svg>`;
+    $("chart").innerHTML = s;
+    $("chart").querySelectorAll(".hit").forEach((r) => r.addEventListener("click", () => { selected = r.dataset.k; renderAll(); }));
+
+    // 7-day summary over logged days
+    const last7 = totals.slice(-7).filter((t) => t.has);
+    const sumDef = last7.reduce((a, t) => a + (c.tdee - t.total), 0);
+    const avg = last7.length ? last7.reduce((a, t) => a + t.total, 0) / last7.length : 0;
+    const under = last7.filter((t) => t.total < c.bmr).length;
+    const rows = [
+      ["Days logged (7d)", `${last7.length} / 7`],
+      ["Avg intake", last7.length ? `${fmt(avg)} kcal` : "–"],
+      ["Total deficit", last7.length ? `${fmt(sumDef)} kcal` : "–"],
+      ["Est. change", last7.length ? `${sumDef >= 0 ? "−" : "+"}${Math.abs(sumDef / 3500).toFixed(2)} lb` : "–"],
+      ["Days under BMR", `${under}`],
+      ["Avg daily deficit", last7.length ? `${fmt(sumDef / last7.length)} kcal` : "–"],
+    ];
+    $("summary").innerHTML = "";
+    for (const [k, v] of rows) {
+      const d = document.createElement("div");
+      const dt = document.createElement("dt"); dt.textContent = k;
+      const dd = document.createElement("dd"); dd.textContent = v;
+      if (k === "Days under BMR" && under > 0) dd.style.color = "var(--low)";
+      d.append(dt, dd); $("summary").append(d);
+    }
+  }
+
+  function fillProfileInputs() {
+    const map = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-sex": "sex", "pf-act": "activity", "pf-def": "deficit" };
+    for (const [id, key] of Object.entries(map)) { const el = $(id); if (document.activeElement !== el) el.value = profile[key]; }
+  }
+
+  function renderAll() { renderNumbers(); renderDay(); renderRecent(); renderHistory(); fillProfileInputs(); }
+
+  // ---------- storage ----------
+  function showNote(text) { $("storage-note").textContent = text; $("storage-note").hidden = !text; }
+
+  function lsLoad() { try { const v = JSON.parse(localStorage.getItem(LS_KEY) || "null"); if (v) { profile = { ...DEFAULT_PROFILE, ...v.profile }; days = v.days || {}; } } catch {} }
+  function lsSave() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ profile, days })); showNote(""); }
+    catch { showNote("Couldn't save to this device. Free up some storage, then export a backup."); }
+  }
+
+  function saveDay(k, entries) {
+    if (entries.length) days[k] = entries; else delete days[k];
+    renderAll();
+    lsSave();
+  }
+
+  let profileTimer;
+  function saveProfile() {
+    renderNumbers(); renderDay(); renderHistory();
+    clearTimeout(profileTimer);
+    profileTimer = setTimeout(lsSave, 400);
+  }
+
+  function addEntry(name, kcal, meal) {
+    const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: String(name).trim().slice(0, 120), kcal: Math.max(0, Math.round(Number(kcal))), meal, t: Date.now() };
+    if (!entry.name || !Number.isFinite(entry.kcal)) return;
+    saveDay(selected, [...(days[selected] || []), entry]);
+  }
+
+  // ---------- events ----------
+  $("add-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    addEntry($("f-name").value, $("f-kcal").value, $("f-meal").value);
+    $("f-name").value = ""; $("f-kcal").value = ""; $("f-name").focus();
+  });
+  $("prev").onclick = () => { selected = addDays(selected, -1); renderAll(); };
+  $("next").onclick = () => { if (selected < today()) { selected = addDays(selected, 1); renderAll(); } };
+  const numFields = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-def": "deficit" };
+  for (const [id, key] of Object.entries(numFields)) $(id).addEventListener("input", (e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) { profile[key] = v; saveProfile(); } });
+  $("pf-sex").addEventListener("change", (e) => { profile.sex = e.target.value; saveProfile(); });
+  $("pf-act").addEventListener("change", (e) => { profile.activity = e.target.value; saveProfile(); });
+
+  const h = new Date().getHours();
+  $("f-meal").value = h < 10 ? "breakfast" : h < 15 ? "lunch" : h < 21 ? "dinner" : "snack";
+
+  // ---------- import / export ----------
+  const MEAL_MAP = { "早餐": "breakfast", "午餐": "lunch", "午餐補給": "lunch", "晚餐": "dinner", "點心": "snack", "下午點心": "snack", "晚間點心": "snack", "宵夜": "snack", "宵夜飲品": "snack",
+    breakfast: "breakfast", lunch: "lunch", dinner: "dinner", snack: "snack" };
+  let pending = null;
+
+  function parseCSV(text) {
+    const rows = []; let row = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+      else cell += ch;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c));
+  }
+
+  function fromCSV(text) {
+    const rows = parseCSV(text);
+    const out = {}; const bad = [];
+    rows.forEach((r, n) => {
+      if (/^date$/i.test(r[0])) return;
+      const [date, mealRaw = "", item = "", qty = "", kcalRaw = "", protRaw = ""] = r;
+      const kcal = Number(kcalRaw);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !item || !Number.isFinite(kcal)) { bad.push(n + 1); return; }
+      const meal = MEAL_MAP[mealRaw] || MEAL_MAP[mealRaw.toLowerCase()] || "other";
+      const e = { id: "csv" + date.replace(/-/g, "") + String(n).padStart(3, "0"), name: qty && qty !== "-" ? `${item} · ${qty}` : item, kcal: Math.round(kcal), meal, mealLabel: mealRaw, t: parseKey(date).getTime() + 12 * 3600e3 + n };
+      const prot = parseFloat(protRaw); if (Number.isFinite(prot)) e.protein = prot;
+      (out[date] = out[date] || []).push(e);
+    });
+    return { days: out, bad };
+  }
+
+  function showPreview(data) {
+    const box = $("import-preview"); box.hidden = false; box.innerHTML = "";
+    const keys = Object.keys(data.days || {}).sort();
+    if (!keys.length && !data.profile) {
+      box.className = "preview err";
+      box.textContent = "Nothing to import. Use a backup file from this app, or a CSV with the columns Date, Meal, Item, Weight_or_Qty, Calories_kcal, Protein_g.";
+      pending = null; return;
+    }
+    pending = data;
+    box.className = "preview";
+    const replaced = keys.filter((k) => days[k]).length;
+    const head = document.createElement("strong");
+    head.textContent = `Import ${keys.length} day${keys.length === 1 ? "" : "s"}` + (replaced ? ` (${replaced} replace days already in your log)` : "") + (data.profile ? " and your profile" : "");
+    const ul = document.createElement("ul");
+    for (const k of keys) { const li = document.createElement("li"); li.textContent = `${k}  ${fmt(sum(data.days[k]))} kcal · ${data.days[k].length} item${data.days[k].length === 1 ? "" : "s"}${days[k] ? "  (replaces)" : ""}`; ul.append(li); }
+    box.append(head, ul);
+    if (data.bad && data.bad.length) { const w = document.createElement("span"); w.textContent = `Skipped line${data.bad.length === 1 ? "" : "s"} ${data.bad.join(", ")}: missing a date, item or calories.`; box.append(w); }
+    const row = document.createElement("div"); row.className = "data-actions";
+    const ok = document.createElement("button"); ok.className = "btn primary"; ok.type = "button"; ok.textContent = "Import";
+    const no = document.createElement("button"); no.className = "btn"; no.type = "button"; no.textContent = "Cancel";
+    ok.onclick = () => {
+      Object.assign(days, pending.days || {});
+      if (pending.profile) profile = { ...DEFAULT_PROFILE, ...pending.profile };
+      lsSave(); renderAll();
+      box.className = "preview"; box.textContent = `Imported ${keys.length} day${keys.length === 1 ? "" : "s"}.`;
+      $("csv-text").value = ""; pending = null;
+    };
+    no.onclick = () => { box.hidden = true; pending = null; };
+    row.append(ok, no); box.append(row);
+  }
+
+  function handleText(text, name = "") {
+    const t = text.replace(/^﻿/, "").trim();
+    if (t.startsWith("{")) {
+      try {
+        const v = JSON.parse(t);
+        if (!v || typeof v.days !== "object") throw 0;
+        const clean = {};
+        for (const [k, list] of Object.entries(v.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Array.isArray(list)) clean[k] = list.filter((e) => e && e.name && Number.isFinite(Number(e.kcal)));
+        return showPreview({ days: clean, profile: v.profile && typeof v.profile === "object" ? v.profile : null });
+      } catch { return showPreview({ days: {} }); }
+    }
+    showPreview(fromCSV(t));
+  }
+
+  $("csv-check").onclick = () => handleText($("csv-text").value);
+  $("import-file").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    handleText(await f.text(), f.name); e.target.value = "";
+  });
+  $("export").onclick = () => {
+    const blob = new Blob([JSON.stringify({ app: "deficit-diary", version: 1, exported: new Date().toISOString(), profile, days }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `deficit-diary-backup-${today()}.json`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+
+  // ---------- install ----------
+  let installEvt = null;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("install-btn").hidden = false; });
+  $("install-btn").onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("install-btn").hidden = true; };
+  window.addEventListener("appinstalled", () => { $("install-btn").hidden = true; });
+  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+
+  // ---------- boot ----------
+  lsLoad();
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {}
+  renderAll();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
+})();
+</script>
+</body>
+</html>
