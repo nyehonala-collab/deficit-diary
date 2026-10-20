@@ -1,6 +1,6 @@
 // Offline support: app files are cached on install; pages load network-first so updates arrive,
 // everything else (icons, fonts) is served from cache and refreshed in the background.
-const CACHE = "deficit-diary-v2";
+const CACHE = "deficit-diary-v5";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png"];
 
 self.addEventListener("install", (e) => {

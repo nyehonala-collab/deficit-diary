@@ -93,6 +93,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .status.low { background: var(--low-soft); color: var(--low); border-color: color-mix(in srgb, var(--low) 30%, transparent); }
 .status.low strong::before { content: "⚠ "; }
 .status.good { background: var(--good-soft); color: var(--good); }
+.status.deep { background: var(--good-soft); color: var(--good); }
 .status.mid { background: var(--accent-soft); color: var(--accent); }
 .status.over { background: var(--over-soft); color: var(--over); }
 .status.empty { background: var(--bg); color: var(--muted); }
@@ -169,13 +170,15 @@ svg.chart { width: 100%; height: auto; display: block; min-width: 300px; }
 .chart .ref-goal { stroke: var(--good); stroke-dasharray: 6 3; opacity: .7; }
 .chart .lbl-bmr { fill: var(--low); font: 600 10px var(--font-mono); }
 .chart .lbl-tdee { fill: var(--muted); font: 600 10px var(--font-mono); }
-.chart .lbl-goal { fill: var(--good); font: 600 10px var(--font-mono); }
-.chart .b-low { fill: var(--low); } .chart .b-good { fill: var(--good); } .chart .b-mid { fill: var(--accent); } .chart .b-over { fill: var(--over); }
+.chart .lbl-target { fill: var(--good); font: 600 10px var(--font-mono); }
+.chart .b-low { fill: var(--low); } .chart .b-good { fill: var(--good); } .chart .b-mid { fill: var(--accent); } .chart .b-deep { fill: var(--good); }
+.chart .band { fill: var(--good-soft); } .chart .b-over { fill: var(--over); }
 .chart .sel { fill: var(--accent-soft); }
 .chart .hit { fill: transparent; cursor: pointer; }
 .chart .base { stroke: var(--line); }
 .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 14px; }
 .summary div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 4px 0; }
+@media (max-width: 480px) { .summary { grid-template-columns: minmax(0, 1fr); } }
 .summary dt { color: var(--muted); } .summary dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
@@ -271,7 +274,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
         <div class="stats">
           <div class="stat"><span class="k">BMR · at rest</span><span class="v" id="s-bmr">–</span></div>
           <div class="stat"><span class="k">TDEE · maintenance</span><span class="v" id="s-tdee">–</span></div>
-          <div class="stat"><span class="k">Calorie goal</span><span class="v" id="s-goal">–</span></div>
+          <div class="stat"><span class="k">Calorie target</span><span class="v" id="s-goal">–</span></div>
           <div class="stat"><span class="k">Protein goal</span><span class="v" id="s-prot">–</span></div>
         </div>
         <details>
@@ -282,7 +285,8 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
             <label>Weight lb<input id="pf-lb" type="number" min="60" max="600" step="0.1"></label>
             <label>Age<input id="pf-age" type="number" min="15" max="100"></label>
             <label>Sex<select id="pf-sex"><option value="female">Female</option><option value="male">Male</option></select></label>
-            <label>Deficit goal<input id="pf-def" type="number" min="0" max="1500" step="50"></label>
+            <label>Deficit min<input id="pf-dmin" type="number" min="0" max="1500" step="50"></label>
+            <label>Deficit max<input id="pf-dmax" type="number" min="0" max="1500" step="50"></label>
             <label>Protein goal g<input id="pf-prot" type="number" min="0" max="300" step="5"></label>
             <label class="wide">Activity
               <select id="pf-act">
@@ -295,15 +299,15 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
             </label>
           </div>
         </details>
-        <p class="formula"><span id="s-bmi"></span> BMR uses Mifflin–St Jeor. TDEE = BMR × activity factor. Goal = TDEE − deficit goal. Protein goal of about 1.6 g per kg body weight helps keep muscle in a deficit. Update your weight as it changes and the numbers follow.</p>
+        <p class="formula"><span id="s-bmi"></span> BMR uses Mifflin–St Jeor. TDEE = BMR × activity factor. Target range = TDEE minus your deficit range. Protein goal of about 1.6 g per kg body weight helps keep muscle in a deficit. Update your weight as it changes and the numbers follow.</p>
       </section>
 
       <section class="panel" aria-label="Last 14 days">
         <h2>Last 14 days</h2>
         <div class="chart-wrap" id="chart"></div>
         <div class="legend">
-          <span><i style="background:var(--good)"></i>At or under goal</span>
-          <span><i style="background:var(--accent)"></i>Small deficit</span>
+          <span><i style="background:var(--good)"></i>BMR to target</span>
+          <span><i style="background:var(--accent)"></i>Above target, still a deficit</span>
           <span><i style="background:var(--over)"></i>Over TDEE</span>
           <span><i style="background:var(--low)"></i>Under BMR</span>
         </div>
@@ -337,7 +341,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
 <script>
 (() => {
   const ACT = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, extra: 1.9 };
-  const DEFAULT_PROFILE = { heightFt: 5, heightIn: 10, weightLb: 136, age: 47, sex: "female", activity: "light", deficit: 432, proteinGoal: 100 };
+  const DEFAULT_PROFILE = { heightFt: 5, heightIn: 10, weightLb: 136, age: 47, sex: "female", activity: "moderate", deficitMin: 300, deficitMax: 500, proteinGoal: 100 };
   const MEALS = ["breakfast", "lunch", "dinner", "snack", "other"];
   const MEAL_LABEL = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", other: "Other / day summary" };
   const LS_KEY = "deficit-diary-v1";
@@ -360,8 +364,9 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     const cm = (p.heightFt * 12 + p.heightIn) * 2.54;
     const bmr = 10 * kg + 6.25 * cm - 5 * p.age + (p.sex === "male" ? 5 : -161);
     const tdee = bmr * (ACT[p.activity] || 1.55);
-    const goal = Math.max(bmr, tdee - (p.deficit || 0));
-    return { bmr: Math.round(bmr), tdee: Math.round(tdee), goal: Math.round(goal), bmi: kg / ((cm / 100) ** 2) };
+    const dMin = Number.isFinite(p.deficitMin) ? p.deficitMin : 300, dMax = Number.isFinite(p.deficitMax) ? p.deficitMax : 500;
+    const lo = Math.max(bmr, tdee - Math.max(dMin, dMax)), hi = Math.max(bmr, tdee - Math.min(dMin, dMax));
+    return { bmr: Math.round(bmr), tdee: Math.round(tdee), goalLo: Math.round(lo), goalHi: Math.round(hi), bmi: kg / ((cm / 100) ** 2) };
   }
   const psum = (entries) => (entries || []).reduce((a, e) => a + (Number(e.protein) || 0), 0);
   const hasProt = (entries) => (entries || []).some((e) => Number.isFinite(Number(e.protein)) && e.protein !== undefined && e.protein !== null && e.protein !== "");
@@ -370,7 +375,8 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
   function classify(total, c, hasEntries) {
     if (!hasEntries) return "empty";
     if (total < c.bmr) return "low";
-    if (total <= c.goal) return "good";
+    if (total < c.goalLo) return "deep";
+    if (total <= c.goalHi) return "good";
     if (total < c.tdee) return "mid";
     return "over";
   }
@@ -380,10 +386,10 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     const c = calc(profile);
     $("s-bmr").innerHTML = `${fmt(c.bmr)} <small>kcal</small>`;
     $("s-tdee").innerHTML = `${fmt(c.tdee)} <small>kcal</small>`;
-    $("s-goal").innerHTML = `${fmt(c.goal)} <small>kcal</small>`;
+    $("s-goal").innerHTML = `${fmt(c.goalLo)}–<wbr>${fmt(c.goalHi)} <small>kcal</small>`;
     $("s-prot").innerHTML = `${fmt(profile.proteinGoal)} <small>g · ${(profile.proteinGoal / (profile.weightLb * 0.45359237)).toFixed(1)} g/kg</small>`;
     $("s-bmi").textContent = `BMI ${c.bmi.toFixed(1)} (${c.bmi < 18.5 ? "underweight" : c.bmi < 25 ? "healthy range" : c.bmi < 30 ? "overweight" : "obese range"}).`;
-    $("hdr-range").textContent = `Safe deficit zone: ${fmt(c.bmr)}–${fmt(c.tdee)} kcal`;
+    $("hdr-range").textContent = `Target ${fmt(c.goalLo)}–${fmt(c.goalHi)} kcal · never under ${fmt(c.bmr)}`;
   }
 
   function renderDay() {
@@ -401,25 +407,20 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     $("next").disabled = selected >= today();
 
     $("total").textContent = fmt(total);
-    const left = c.goal - total;
-    $("remaining").textContent = left > 0 ? `· ${fmt(left)} left to goal` : "";
+    $("remaining").textContent = total < c.goalLo ? `· ${fmt(c.goalLo - total)}–${fmt(c.goalHi - total)} to target` : total <= c.goalHi ? "· in target range" : "";
 
     // gauge
     const max = Math.max(c.tdee * 1.15, total * 1.05);
     const pct = (v) => Math.min(100, (v / max) * 100);
     $("gauge").innerHTML =
       `<div class="zone" style="left:0;width:${pct(c.bmr)}%;background:var(--low-soft)"></div>` +
-      `<div class="zone" style="left:${pct(c.bmr)}%;width:${pct(c.goal) - pct(c.bmr)}%;background:var(--good-soft)"></div>` +
-      `<div class="zone" style="left:${pct(c.goal)}%;width:${pct(c.tdee) - pct(c.goal)}%;background:var(--accent-soft)"></div>` +
+      `<div class="zone" style="left:${pct(c.bmr)}%;width:${pct(c.goalLo) - pct(c.bmr)}%;background:var(--good-soft)"></div>` +
+      `<div class="zone" style="left:${pct(c.goalLo)}%;width:${pct(c.goalHi) - pct(c.goalLo)}%;background:var(--good-soft)"></div>` +
+      `<div class="zone" style="left:${pct(c.goalHi)}%;width:${pct(c.tdee) - pct(c.goalHi)}%;background:var(--accent-soft)"></div>` +
       `<div class="zone" style="left:${pct(c.tdee)}%;right:0;background:var(--over-soft)"></div>` +
       `<div class="fill" style="width:${pct(total)}%"></div>`;
-    const marks = [["BMR", c.bmr], ["Goal", c.goal], ["TDEE", c.tdee]];
-    // when two marks sit close together, anchor the left one's label to the right of its tick and the next one's to the left
-    const close = marks.map((m, i) => i < marks.length - 1 && pct(marks[i + 1][1]) - pct(m[1]) < 16);
-    $("marks").innerHTML = marks.map(([l, v], i) => {
-      const cls = close[i] ? "end" : (i > 0 && close[i - 1]) ? "start" : "";
-      return `<span class="${cls}" style="left:${pct(v)}%">${l}<br><b>${fmt(v)}</b></span>`;
-    }).join("");
+    const marks = [["BMR", fmt(c.bmr), c.bmr, "end"], ["Target", "", (c.goalLo + c.goalHi) / 2, ""], ["TDEE", fmt(c.tdee), c.tdee, ""]];
+    $("marks").innerHTML = marks.map(([l, txt, v, cls]) => `<span class="${cls}" style="left:${pct(v)}%">${l}<br><b>${txt}</b></span>`).join("");
 
     // status
     const st = classify(total, c, entries.length > 0);
@@ -427,10 +428,11 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     const box = $("status");
     box.className = "status " + st;
     const msg = {
-      empty: [`Nothing logged ${isToday ? "yet today" : "for this day"}`, `Aim for ${fmt(c.bmr)}–${fmt(c.tdee)} kcal. Your goal is ${fmt(c.goal)}.`],
+      empty: [`Nothing logged ${isToday ? "yet today" : "for this day"}`, `Aim for ${fmt(c.goalLo)}–${fmt(c.goalHi)} kcal, and never under ${fmt(c.bmr)}.`],
       low: [`Below your BMR by ${fmt(c.bmr - total)} kcal`, `Eating under ${fmt(c.bmr)} kcal can cost muscle and slow your metabolism. ${isToday ? `Add at least ${fmt(c.bmr - total)} kcal today.` : "Try to stay above it."}`],
-      good: [`On target · ${fmt(deficit)} kcal deficit`, `Between your BMR and your goal. About ${(deficit / 3500).toFixed(2)} lb of fat.`],
-      mid: [`${fmt(deficit)} kcal deficit`, `Still under maintenance, ${fmt(total - c.goal)} kcal above your goal.`],
+      deep: [`${fmt(deficit)} kcal deficit · bigger than planned`, isToday ? `Add about ${fmt(c.goalLo - total)} kcal to reach your ${fmt(c.goalLo)}–${fmt(c.goalHi)} target.` : `Below your ${fmt(c.goalLo)}–${fmt(c.goalHi)} target, but above BMR.`],
+      good: [`On target · ${fmt(deficit)} kcal deficit`, `Inside your ${fmt(c.goalLo)}–${fmt(c.goalHi)} target. About ${(deficit / 3500).toFixed(2)} lb of fat.`],
+      mid: [`${fmt(deficit)} kcal deficit · smaller than planned`, `${fmt(total - c.goalHi)} kcal above your target, still under maintenance.`],
       over: [`No deficit · ${fmt(total - c.tdee)} kcal over TDEE`, `You ate at or above maintenance (${fmt(c.tdee)} kcal).`],
     }[st];
     box.innerHTML = "";
@@ -508,6 +510,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
     const bw = (W - L - R) / keys.length;
     let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily calories for the last 14 days">`;
     totals.forEach((t, i) => { if (t.k === selected) s += `<rect class="sel" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}" rx="4"/>`; });
+    s += `<rect class="band" x="${L}" width="${W - R - L}" y="${y(c.goalHi)}" height="${Math.max(1, y(c.goalLo) - y(c.goalHi))}"/>`;
     s += `<line class="base" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>`;
     totals.forEach((t, i) => {
       if (t.has) {
@@ -518,11 +521,11 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
       s += `<text class="axis" x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle">${d.getDate()}</text>`;
       s += `<rect class="hit" data-k="${t.k}" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T}"><title>${t.k}</title></rect>`;
     });
-    for (const [cls, v, lbl] of [["tdee", c.tdee, "TDEE"], ["goal", c.goal, "Goal"], ["bmr", c.bmr, "BMR"]]) {
+    for (const [cls, v, lbl] of [["tdee", c.tdee, "TDEE"], ["bmr", c.bmr, "BMR"]]) {
       s += `<line class="ref-${cls}" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
     }
     // stagger labels if they collide
-    const labels = [["tdee", c.tdee, "TDEE"], ["goal", c.goal, "Goal"], ["bmr", c.bmr, "BMR"]].map(([cls, v, l]) => ({ cls, l, v, yy: y(v) + 3 }));
+    const labels = [["tdee", c.tdee, "TDEE"], ["target", (c.goalLo + c.goalHi) / 2, "Target"], ["bmr", c.bmr, "BMR"]].map(([cls, v, l]) => ({ cls, l, v, yy: y(v) + 3 }));
     for (let i = 1; i < labels.length; i++) if (labels[i].yy - labels[i - 1].yy < 11) labels[i].yy = labels[i - 1].yy + 11;
     for (const lb of labels) s += `<text class="lbl-${lb.cls}" x="${W - R + 6}" y="${lb.yy}">${lb.l}</text>`;
     s += `</svg>`;
@@ -554,7 +557,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
   }
 
   function fillProfileInputs() {
-    const map = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-sex": "sex", "pf-act": "activity", "pf-def": "deficit", "pf-prot": "proteinGoal" };
+    const map = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-sex": "sex", "pf-act": "activity", "pf-dmin": "deficitMin", "pf-dmax": "deficitMax", "pf-prot": "proteinGoal" };
     for (const [id, key] of Object.entries(map)) { const el = $(id); if (document.activeElement !== el) el.value = profile[key]; }
   }
 
@@ -824,7 +827,7 @@ textarea { font: 12px/1.4 var(--font-mono); color: var(--ink); background: var(-
   });
   $("prev").onclick = () => { selected = addDays(selected, -1); renderAll(); };
   $("next").onclick = () => { if (selected < today()) { selected = addDays(selected, 1); renderAll(); } };
-  const numFields = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-def": "deficit", "pf-prot": "proteinGoal" };
+  const numFields = { "pf-ft": "heightFt", "pf-in": "heightIn", "pf-lb": "weightLb", "pf-age": "age", "pf-dmin": "deficitMin", "pf-dmax": "deficitMax", "pf-prot": "proteinGoal" };
   for (const [id, key] of Object.entries(numFields)) $(id).addEventListener("input", (e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) { profile[key] = v; saveProfile(); } });
   $("pf-sex").addEventListener("change", (e) => { profile.sex = e.target.value; saveProfile(); });
   $("pf-act").addEventListener("change", (e) => { profile.activity = e.target.value; saveProfile(); });
